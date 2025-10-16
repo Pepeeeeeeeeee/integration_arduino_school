@@ -1,58 +1,54 @@
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/i2c.h"
-#include "esp_log.h"
-#include "lib/noise_sensor_lib/SensorHub.h"
+#include <Arduino.h>
+#include "SensorHub.h"
 
-static const char *TAG = "SensorHubExample";
+#define I2S_WS   15   // Connect to INMP441 LRCLK
+#define I2S_BCLK 14   // Connect to INMP441 BCLK
+#define I2S_D    32   // Connect to INMP441 DATA
+#define SAMPLE_RATE 16000
 
-// I2C configuration
-#define I2C_MASTER_SCL_IO          22
-#define I2C_MASTER_SDA_IO          21
-#define I2C_MASTER_NUM             I2C_NUM_0
-#define I2C_MASTER_FREQ_HZ         100000
-#define I2C_MASTER_TX_BUF_DISABLE  0
-#define I2C_MASTER_RX_BUF_DISABLE  0
+SensorHub mic(I2S_WS, I2S_BCLK, I2S_D, SAMPLE_RATE, I2S_CHANNEL_LEFT);
 
-extern "C" void app_main(void)
-{
-    // --- Initialize I2C driver ---
-    i2c_config_t conf = {};
-    conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = I2C_MASTER_SDA_IO;
-    conf.scl_io_num = I2C_MASTER_SCL_IO;
-    conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
-    ESP_ERROR_CHECK(i2c_param_config(I2C_MASTER_NUM, &conf));
-    ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, conf.mode,
-                                       I2C_MASTER_RX_BUF_DISABLE,
-                                       I2C_MASTER_TX_BUF_DISABLE, 0));
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+    Serial.println("INMP441 I2S Microphone Test");
 
-    ESP_LOGI(TAG, "I2C initialized");
+    // I2S initialization for ESP32
+    i2s_config_t i2s_config = {
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
+        .sample_rate = SAMPLE_RATE,
+        .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
+        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
+        .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+        .dma_buf_count = 8,
+        .dma_buf_len = 1024,
+        .use_apll = false,
+        .tx_desc_auto_clear = false,
+        .fixed_mclk = 0
+    };
 
-    // --- Initialize SensorHub instance ---
-    uint8_t sensor_address = 0x40; // Replace with actual address
-    SensorHub sensor(sensor_address);
+    i2s_pin_config_t pin_config = {
+        .bck_io_num = I2S_BCLK,
+        .ws_io_num = I2S_WS,
+        .data_out_num = I2S_PIN_NO_CHANGE,
+        .data_in_num = I2S_D
+    };
 
-    // --- Check if the sensor is connected ---
-    if (sensor.is_sensor_connected()) {
-        ESP_LOGI(TAG, "Sensor detected at address 0x%02X", sensor_address);
-    } else {
-        ESP_LOGE(TAG, "Sensor not detected at address 0x%02X", sensor_address);
-    }
+    i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+    i2s_set_pin(I2S_NUM_0, &pin_config);
+}
 
-    // --- Main loop ---
-    uint8_t data = 0;
-    while (true) {
-        bool ok = sensor.i2c_readByte(0x00, &data, 1);
-        if (ok) {
-            ESP_LOGI(TAG, "Register 0x00 = 0x%02X (%u)", data, data);
-        } else {
-            ESP_LOGW(TAG, "Failed to read register 0x00");
-        }
+void loop() {
+    int32_t sample;
+    size_t bytes_read;
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
+    // Read one sample
+    i2s_read(I2S_NUM_0, &sample, sizeof(sample), &bytes_read, portMAX_DELAY);
+
+    // Convert to int16_t for simplicity
+    int16_t value = sample >> 16;
+    Serial.println(value);
+
+    delay(10);
 }
