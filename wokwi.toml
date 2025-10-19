@@ -1,0 +1,6 @@
+[wokwi]
+name = "ESP32 Sensor Project"
+description = "ESP32 with DHT22, BH1750 light sensor, and INMP441 microphone"
+platform = "esp32dev"
+firmware = "src/main.cpp"
+monitor_speed = 115200
