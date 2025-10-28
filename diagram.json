@@ -4,7 +4,7 @@
   "editor": "wokwi",
   "parts": [
     { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    { "type": "wokwi-dht22", "id": "dht", "top": 50, "left": 50, "attrs": {} },
+    { "type": "wokwi-dht11", "id": "dht", "top": 50, "left": 50, "attrs": {} },
     { "type": "wokwi-bh1750", "id": "bh1750", "top": 50, "left": 150, "attrs": {} },
     { "type": "wokwi-inmp441", "id": "mic", "top": 50, "left": 250, "attrs": {} }
   ],

@@ -10,10 +10,9 @@
             "includePath": [
                 "/home/pepe/arduino/include",
                 "/home/pepe/arduino/src",
-                "/home/pepe/arduino/lib/hp_BH1750",
-                "/home/pepe/arduino/lib/DHT_sensor",
-                "/home/pepe/arduino/lib/Adafruit_sensor_driver",
-                "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
+                "/home/pepe/arduino/lib/INMP441",
+                "/home/pepe/arduino/lib/DHT11",
+                "/home/pepe/arduino/lib/BH1750",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos",
@@ -210,7 +209,7 @@
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/dio_qspi/include",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/variants/esp32",
-                "/home/pepe/arduino/lib/SensorHub",
+                "/home/pepe/arduino/lib/INMP441_arduino",
                 "/home/pepe/arduino/lib/usart",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
@@ -244,6 +243,7 @@
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                 "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
+                "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                 ""
             ],
             "browse": {
@@ -251,10 +251,9 @@
                 "path": [
                     "/home/pepe/arduino/include",
                     "/home/pepe/arduino/src",
-                    "/home/pepe/arduino/lib/hp_BH1750",
-                    "/home/pepe/arduino/lib/DHT_sensor",
-                    "/home/pepe/arduino/lib/Adafruit_sensor_driver",
-                    "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
+                    "/home/pepe/arduino/lib/INMP441",
+                    "/home/pepe/arduino/lib/DHT11",
+                    "/home/pepe/arduino/lib/BH1750",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos",
@@ -451,7 +450,7 @@
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/dio_qspi/include",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/variants/esp32",
-                    "/home/pepe/arduino/lib/SensorHub",
+                    "/home/pepe/arduino/lib/INMP441_arduino",
                     "/home/pepe/arduino/lib/usart",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
@@ -485,13 +484,13 @@
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                     "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
+                    "/home/pepe/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                     ""
                 ]
             },
             "defines": [
                 "PLATFORMIO=60118",
                 "ARDUINO_ESP32_DEV",
-                "SOC_I2S_SUPPORTS_ADC",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
                 "UNITY_INCLUDE_CONFIG_H",

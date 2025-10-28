@@ -1,111 +1,58 @@
 #include <Arduino.h>
-#include "DHT_U.h"           // DHT Unified sensor
-#include "Adafruit_Sensor.h" // Adafruit sensor base
-#include <Wire.h>
-#include "hp_BH1750.h"       // BH1750 light sensor
+#include "BH1750.h"
+#include "INMP441_arduino.h"
+#include "DHT11.h"
 
-// ---------- PLACEHOLDER PINS ----------
-#define DHTPIN 4          // Replace with your actual DHT pin
-#define DHTTYPE DHT22     // Replace with DHT11/DHT22
-#define INMP441_I2S_WS 15 // I2S Word Select / LRCK
-#define INMP441_I2S_SD 32 // I2S Serial Data
-#define INMP441_I2S_SCK 14 // I2S Serial Clock
+#define DHT_PIN 4
 
-// ---------- SENSOR OBJECTS ----------
-DHT_Unified dht(DHTPIN, DHTTYPE);
-DHT_Unified::Temperature tempSensorObj(&dht, 1);
-DHT_Unified::Humidity humiditySensorObj(&dht, 2);
-Adafruit_Sensor* tempSensor = &tempSensorObj;
-Adafruit_Sensor* humiditySensor = &humiditySensorObj;
-hp_BH1750 lightSensor; // default constructor
+#define I2S_WS_PIN  15
+#define I2S_SCK_PIN 14
+#define I2S_SD_PIN  32
 
-// ---------- MICROPHONE (I2S) ----------
-#include <driver/i2s.h>
-#define SAMPLE_RATE 16000
-#define I2S_NUM I2S_NUM_0
-#define I2S_READ_LEN 1024
-int16_t i2sReadBuffer[I2S_READ_LEN];
+#define BH1750_SCL_PIN 22
+#define BH1750_DAT_PIN 21
 
-// ---------- FUNCTION TO INIT I2S ----------
-void initI2S() {
-    i2s_config_t i2s_config = {
-        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
-        .sample_rate = SAMPLE_RATE,
-        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-        .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-        .intr_alloc_flags = 0,
-        .dma_buf_count = 8,
-        .dma_buf_len = 1024,
-        .use_apll = false,
-        .tx_desc_auto_clear = false,
-        .fixed_mclk = 0
-    };
-
-    i2s_pin_config_t pin_config = {
-        .bck_io_num = INMP441_I2S_SCK,
-        .ws_io_num = INMP441_I2S_WS,
-        .data_out_num = I2S_PIN_NO_CHANGE,
-        .data_in_num = INMP441_I2S_SD
-    };
-
-    i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
-    i2s_set_pin(I2S_NUM, &pin_config);
-}
-
-// ---------- SETUP ----------
 void setup() {
-    Serial.begin(115200);
-    delay(1000);
-    Serial.println("Initializing sensors...");
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("Starting test...");
 
-    // DHT
-    dht.begin();
+  if (DHT11_init((gpio_num_t)DHT_PIN) != ESP_OK) {
+    Serial.println("DHT11 init failed!");
+  }
 
-    // BH1750
-    Wire.begin(); // default SDA/SCL
-    if (!lightSensor.begin(0x23)) { // default BH1750 address
-        Serial.println("BH1750 not detected!");
-    }
+  if (BH1750_init(I2C_NUM_0, BH1750_ADDR_LOW, BH1750_SCL_PIN, BH1750_DAT_PIN) != ESP_OK) {
+    Serial.println("BH1750 init failed!");
+  }
 
-    // INMP441
-    initI2S();
-
-    Serial.println("Initialization complete!");
+  if (!INMP441_begin(I2S_WS_PIN, I2S_SCK_PIN, I2S_SD_PIN)) {
+    Serial.println("INMP441 init failed!");
+  }
 }
 
-// ---------- MAIN LOOP ----------
 void loop() {
-    sensors_event_t tempEvent, humEvent;
+  float lux = 0.0f;
+  DHT11_Data data;
 
-    // --- Read DHT ---
-    tempSensor->getEvent(&tempEvent);
-    humiditySensor->getEvent(&humEvent);
+  if (BH1750_read_lux(&lux) == ESP_OK) {
+    Serial.printf("Light: %.2f lx\n", lux);
+  } else {
+    Serial.println("Failed to read from BH1750");
+  }
+  
+  if (DHT11_read(&data) == ESP_OK) {
+    Serial.printf("Temp: %.1f°C  Humidity: %.1f%%\n", data.temperature, data.humidity);
+  } else {
+    Serial.println("Failed to read DHT11");
+  }
 
-    Serial.println("----- DHT Sensor -----");
-    Serial.print("Temperature: "); Serial.print(tempEvent.temperature); Serial.println(" °C");
-    Serial.print("Humidity: "); Serial.print(humEvent.relative_humidity); Serial.println(" %");
+  float dB = INMP441_read_level();
+  if (dB == 0) {
+    Serial.println("Failed to read from INMP441");
+  } else {
+    Serial.printf("Sound dB: %.2f\n", dB);
+  }
 
-    // --- Read BH1750 ---
-    float lux = lightSensor.getLux(); // library function
-    Serial.println("----- BH1750 Light Sensor -----");
-    Serial.print("Light Level: "); Serial.print(lux); Serial.println(" lx");
 
-    // --- Read INMP441 ---
-    size_t bytesRead;
-    i2s_read(I2S_NUM, i2sReadBuffer, I2S_READ_LEN * sizeof(int16_t), &bytesRead, portMAX_DELAY);
-
-    // Compute simple RMS amplitude
-    float rms = 0;
-    int samples = bytesRead / sizeof(int16_t);
-    for (int i = 0; i < samples; i++) {
-        rms += i2sReadBuffer[i] * i2sReadBuffer[i];
-    }
-    rms = sqrt(rms / samples);
-    Serial.println("----- INMP441 Microphone -----");
-    Serial.print("RMS Amplitude: "); Serial.println(rms);
-
-    // --- Wait 10 seconds ---
-    Serial.println("\nWaiting 10 seconds...\n");
-    delay(10000);
+  delay(2000);
 }
