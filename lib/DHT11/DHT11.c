@@ -21,6 +21,7 @@ esp_err_t DHT11_init(gpio_num_t pin) {
     dht_pin = pin;
     gpio_set_direction(dht_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(dht_pin, 1);
+    gpio_set_pull_mode(dht_pin, GPIO_PULLUP_ONLY);
     return ESP_OK;
 }
 
@@ -29,9 +30,9 @@ esp_err_t DHT11_read(DHT11_Data *out) {
 
     gpio_set_direction(dht_pin, GPIO_MODE_OUTPUT);
     gpio_set_level(dht_pin, 0);
-    vTaskDelay(pdMS_TO_TICKS(20));
+    ets_delay_us(20000);
     gpio_set_level(dht_pin, 1);
-    esp_rom_delay_us(30);
+    ets_delay_us(30);
     gpio_set_direction(dht_pin, GPIO_MODE_INPUT);
 
     if (wait_for_level(0, DHT_TIMEOUT_US) < 0) return ESP_FAIL;
