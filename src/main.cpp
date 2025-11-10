@@ -6,11 +6,11 @@
 #include "DHT11.h"
 
 // WIFI CREDENTIALS
-static String WIFI_SSID  = "";
-static String WIFI_PASS  = "";
-static String API_URL    = "http://192.168.1.33:8000/v1/ingest";
+static String WIFI_SSID  = "REDACTED-NETWORK-NAME";
+static String WIFI_PASS  = ""; // individual password
+static String API_URL    = "http://10.134.178.156:8000/v1/ingest";
 static String API_KEY    = "REDACTED-API-KEY";
-static String DEVICE_UID = "esp32-1";
+static String DEVICE_UID = "ESP_TEST";
 
 // Send every 1 minute
 static const uint32_t SEND_INTERVAL_MS = 1UL * 60UL * 1000UL;

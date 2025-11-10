@@ -52,11 +52,11 @@ static String httpErrStr(int code) {
 
 static String buildPayload(Measurement* measurement) {
     return String("{") +
-        "\"device_uid\":\"" + apiClient.deviceUid + "\"," +
-        "\"temp_c\":"   + String(measurement->temperatureC, 1) + "," +
-        "\"hum_pct\":"  + String(measurement->humidityPct, 1) + "," +
-        "\"lux\":"      + String(measurement->lightLux, 1) + "," +
-        "\"noise_db\":" + String(measurement->noiseDb, 1) +
+        "\"device_name\":\"" + apiClient.deviceUid + "\"," +
+        "\"temperature\":"   + String(measurement->temperatureC, 1) + "," +
+        "\"humidity\":"  + String(measurement->humidityPct, 1) + "," +
+        "\"luminosity\":"      + String(measurement->lightLux, 1) + "," +
+        "\"noise_levels\":" + String(measurement->noiseDb, 1) +
     "}";
 }
 
