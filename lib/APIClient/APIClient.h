@@ -21,6 +21,7 @@ struct Measurement {
     float humidityPct;
     float lightLux;
     float noiseDb;
+    time_t timestamp;
 };
 
 

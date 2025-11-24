@@ -1,5 +1,6 @@
 #include "APIClient.h"
 
+#include <time.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <esp_system.h>
@@ -51,13 +52,24 @@ static String httpErrStr(int code) {
 }
 
 static String buildPayload(Measurement* measurement) {
-    return String("{") +
-        "\"device_name\":\"" + apiClient.deviceUid + "\"," +
-        "\"temperature\":"   + String(measurement->temperatureC, 1) + "," +
-        "\"humidity\":"  + String(measurement->humidityPct, 1) + "," +
-        "\"luminosity\":"      + String(measurement->lightLux, 1) + "," +
-        "\"noise_levels\":" + String(measurement->noiseDb, 1) +
-    "}";
+    String payload = "{";
+    payload += "\"device_name\":\"" + apiClient.deviceUid + "\",";
+    payload += "\"temperature\":"   + String(measurement->temperatureC, 1) + ",";
+    payload += "\"humidity\":"  + String(measurement->humidityPct, 1) + ",";
+    payload += "\"luminosity\":"      + String(measurement->lightLux, 1) + ",";
+    payload += "\"noise_levels\":" + String(measurement->noiseDb, 1);
+
+    // Add timestamp for buffered measurements
+    if (measurement->timestamp > 0) {
+        char timeStr[20];
+        struct tm * ptm;
+        ptm = gmtime(&(measurement->timestamp));
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", ptm);
+        payload += ",\"time\":\"" + String(timeStr) + "\"";
+    }
+
+    payload += "}";
+    return payload;
 }
 
 bool sendMeasurementOnce(Measurement* measurement) {

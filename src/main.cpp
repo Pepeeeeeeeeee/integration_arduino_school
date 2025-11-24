@@ -1,9 +1,11 @@
 #include <Arduino.h>
+#include <time.h>
 
 #include "APIClient.h"
 #include "BH1750.h"
 #include "INMP441_arduino.h"
 #include "DHT11.h"
+#include "MeasurementBuffer.h"
 
 // WIFI CREDENTIALS
 static String WIFI_SSID  = "REDACTED-NETWORK-NAME";
@@ -13,19 +15,22 @@ static String API_URL    = "http://10.134.178.156:8000/v1/ingest";
 static String API_KEY    = "REDACTED-API-KEY";
 static String DEVICE_UID = "ESP_TEST";
 
-// Send every 5 minutes
-static const uint32_t SEND_INTERVAL_MS = 5UL * 60UL * 1000UL;
+static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000; // Wi-Fi connect attempt window
 
-// Wi-Fi connect attempt window
-static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000;
-// Backoff after a failed send (caps at MAX_BACKOFF_MS)
-static const uint32_t BASE_BACKOFF_MS = 2000;
-static const uint32_t MAX_BACKOFF_MS  = 60000;
+static const uint32_t SEND_INTERVAL_MS = 1UL * 60UL * 1000UL; // Send every 5 minutes 
 
-uint32_t nextSendAt = 0;
-uint32_t backoffMs = BASE_BACKOFF_MS;
+// NTP settings
+const char* NTP_SERVER = "pool.ntp.org";
+const long  GMT_OFFSET_SEC = 3600; // For CET (Brussels)
+const int   DAYLIGHT_OFFSET_SEC = 3600;
 
-// SENSOR DEFINES
+// BUFFER
+#define MEASUREMENT_BUFFER_CAPACITY 50
+
+static MeasurementBuffer measurementBuffer;
+static bool timeSynced = false;
+
+// SENSORS
 #define DHT_PIN 5
 
 #define I2S_WS_PIN  25
@@ -35,8 +40,22 @@ uint32_t backoffMs = BASE_BACKOFF_MS;
 #define BH1750_SCL_PIN 22
 #define BH1750_DAT_PIN 21
 
-static const uint32_t SENSOR_RETRY_WINDOW_MS = 10000;  // try for up to 10 seconds
+static const uint32_t SENSOR_RETRY_WINDOW_MS = 10000;  // Retry window
 static const uint32_t SENSOR_RETRY_DELAY_MS  = 250;   // delay between retries
+
+uint32_t nextSendAt = 5000; // First send after 5 seconds
+
+
+void setupTime() {
+    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+        timeSynced = true;
+        Serial.println("[Time] NTP time synced successfully.");
+    } else {
+        Serial.println("[Time] NTP time sync failed.");
+    }
+}
 
 void setupSensors(){
   if (DHT11_init((gpio_num_t)DHT_PIN) != ESP_OK) {
@@ -57,6 +76,8 @@ void setup() {
   Serial.begin(115200);
   delay(250);
 
+  measurementBuffer.begin(MEASUREMENT_BUFFER_CAPACITY);
+
   printMacAddress();
 
   APIClient client = {
@@ -69,10 +90,9 @@ void setup() {
   };
 
   APIClient_init(client);
-
+  setupTime();
   setupSensors();
 
-  nextSendAt = millis() + 5000; // First send after 5 seconds
   Serial.println("Setup complete.");
 }
 
@@ -94,7 +114,6 @@ bool readBH1750_with_retry(float *lux) {
   return false;
 }
 
-// Retry wrapper for DHT11
 bool readDHT11_with_retry(DHT11_Data *data) {
   const uint32_t start = millis();
 
@@ -113,7 +132,6 @@ bool readDHT11_with_retry(DHT11_Data *data) {
   return false;
 }
 
-// Retry wrapper for INMP441
 bool readINMP441_with_retry(float *dB) {
   const uint32_t start = millis();
 
@@ -134,61 +152,75 @@ bool readINMP441_with_retry(float *dB) {
   return false;
 }
 
+void flushBuffer() {
+    Serial.printf("[Flush] %u measurements in buffer. Flushing...\n", measurementBuffer.getCount());
+    Measurement m;
+    while (measurementBuffer.peek(m)) {
+        Serial.printf("[Flush] Sending measurement from %ld\n", m.timestamp);
+        if (sendMeasurementOnce(&m)) {
+            measurementBuffer.pop(m); // Remove from buffer on success
+        } 
+        else {
+            Serial.println("[Flush] Send failed. Stopping flush.");
+            return; // Stop flushing on failure
+        }
+    }
+    Serial.println("[Flush] Buffer flushed successfully.");
+}
 
 void loop() {
   const uint32_t now = millis();
 
   if (now >= nextSendAt) {
+    if (!timeSynced) {
+        setupTime(); // Try to re-sync time if it failed
+    }
+
+    if (!timeSynced) {
+        Serial.println("[Loop] Cannot take new measurement, time is not synced.");
+        nextSendAt = now + SEND_INTERVAL_MS;
+        return;
+    }
+
     float lux = 0.0f;
     DHT11_Data dhtData = {};
     float dB = 0.0f;
 
-    Serial.println("Taking measurements...");
+    Serial.println("[Sensors] Taking measurements...");
 
-    // BH1750
     bool luxOk = readBH1750_with_retry(&lux);
-    if (luxOk) {
-      Serial.printf("Light: %.2f lx\n", lux);
-    } else {
-      Serial.println("BH1750 final read failed, using last attempt value (likely 0)");
-    }
-
-    // DHT11
     bool dhtOk = readDHT11_with_retry(&dhtData);
-    if (dhtOk) {
-      Serial.printf("Temp: %.1f°C  Humidity: %.1f%%\n", dhtData.temperature, dhtData.humidity);
-    } else {
-      Serial.println("DHT11 final read failed, using last attempt values (likely 0)");
-    }
-
-    // INMP441
     bool dBok = readINMP441_with_retry(&dB);
-    if (dBok) {
-      Serial.printf("Sound dB: %.2f\n", dB);
-    } else {
-      Serial.println("INMP441 final read failed, using last attempt value (likely 0)");
-    }
 
-    Serial.println("===========================");
-    Serial.println("Sending measurements...");
+    Serial.println("--------------------------------------------");
 
     Measurement measurement = {
       .temperatureC = dhtData.temperature,
       .humidityPct  = dhtData.humidity,
       .lightLux     = lux,
-      .noiseDb      = dB
+      .noiseDb      = dB,
+      .timestamp    =  0
     };
 
     if (sendMeasurementOnce(&measurement)) {
-      backoffMs = BASE_BACKOFF_MS;
-      nextSendAt = now + SEND_INTERVAL_MS;
+      // After a successful send, try to flush the buffer
+      if (!measurementBuffer.isEmpty()) {
+        flushBuffer();
+      }
+    } 
+    else {
+      Serial.println("Send failed, attempting to buffer measurement.");
+      measurement.timestamp = time(nullptr);
+      if (measurementBuffer.push(measurement)) {
+          Serial.println("Measurement buffered successfully.");
     } else {
-      nextSendAt = now + backoffMs;
-      backoffMs = min(backoffMs * 2, MAX_BACKOFF_MS);
-      Serial.printf("Send failed, backing off to %lu ms\n", backoffMs);
+          Serial.println("Buffer is full, measurement lost!");
+      }
     }
 
+    nextSendAt = now + SEND_INTERVAL_MS;
     Serial.println("Next send in " + String(nextSendAt - now) + " ms");
+    Serial.println("============================================");
   }
 
   delay(50);

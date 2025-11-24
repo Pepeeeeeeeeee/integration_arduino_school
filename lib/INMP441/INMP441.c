@@ -85,3 +85,4 @@ float INMP441_read_level(void) {
     free(samples);
     return rms;
 }
+
