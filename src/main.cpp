@@ -1,7 +1,4 @@
 #include <Arduino.h>
-#include <time.h>
-
-#include "APIClient.h"
 #include "BH1750.h"
 #include "INMP441_arduino.h"
 #include "DHT11.h"
@@ -16,8 +13,7 @@ static String API_KEY    = "REDACTED-API-KEY";
 static String DEVICE_UID = "ESP_TEST";
 
 static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000; // Wi-Fi connect attempt window
-
-static const uint32_t SEND_INTERVAL_MS = 1UL * 60UL * 1000UL; // Send every 5 minutes 
+static const uint32_t SEND_INTERVAL_MS = 5UL * 60UL * 1000UL; // Send every 5 minutes 
 
 // NTP settings
 const char* NTP_SERVER = "pool.ntp.org";
@@ -25,7 +21,7 @@ const long  GMT_OFFSET_SEC = 3600; // For CET (Brussels)
 const int   DAYLIGHT_OFFSET_SEC = 3600;
 
 // BUFFER
-#define MEASUREMENT_BUFFER_CAPACITY 50
+#define MEASUREMENT_BUFFER_CAPACITY 100
 
 static MeasurementBuffer measurementBuffer;
 static bool timeSynced = false;
@@ -42,8 +38,10 @@ static bool timeSynced = false;
 
 static const uint32_t SENSOR_RETRY_WINDOW_MS = 10000;  // Retry window
 static const uint32_t SENSOR_RETRY_DELAY_MS  = 250;   // delay between retries
+static const uint32_t SENSOR_READ_INTERVAL_MS = 1000; // Read every second for averaging
 
 uint32_t nextSendAt = 5000; // First send after 5 seconds
+uint32_t nextReadAt = 2500; // First read after 2.5 seconds
 
 
 void setupTime() {
@@ -168,8 +166,42 @@ void flushBuffer() {
     Serial.println("[Flush] Buffer flushed successfully.");
 }
 
+const uint8_t readingsBufferSize = SEND_INTERVAL_MS / SENSOR_READ_INTERVAL_MS;
+float tempBuffer[readingsBufferSize];
+float humBuffer[readingsBufferSize];
+float luxBuffer[readingsBufferSize];
+float noiseBuffer[readingsBufferSize];
+uint8_t currentReadingIndex = 0;
+
 void loop() {
   const uint32_t now = millis();
+
+  if (now >= nextReadAt) {
+    DHT11_Data dhtData;
+    float lux = 0.0f;
+    float noiseDb = 0.0f;
+
+    bool dhtOk = readDHT11_with_retry(&dhtData);
+    bool bhOk  = readBH1750_with_retry(&lux);
+    bool inmpOk= readINMP441_with_retry(&noiseDb);
+
+    if (dhtOk && bhOk && inmpOk) {
+        tempBuffer[currentReadingIndex] = dhtData.temperature;
+        humBuffer[currentReadingIndex]  = dhtData.humidity;
+        luxBuffer[currentReadingIndex]  = lux;
+        noiseBuffer[currentReadingIndex]= noiseDb;
+
+        Serial.printf("[Reading %d] Temp=%.2f C, Hum=%.2f %%, Lux=%.2f lx, Noise=%.2f dB\n", 
+                      currentReadingIndex, dhtData.temperature, dhtData.humidity, lux, noiseDb);
+
+        currentReadingIndex = (currentReadingIndex + 1) % readingsBufferSize;
+    } else {
+        Serial.println("[Read] One or more sensor reads failed, skipping this reading.");
+    }
+
+    nextReadAt = now + SENSOR_READ_INTERVAL_MS;
+    return;
+  }
 
   if (now >= nextSendAt) {
     if (!timeSynced) {
@@ -182,23 +214,31 @@ void loop() {
         return;
     }
 
-    float lux = 0.0f;
-    DHT11_Data dhtData = {};
-    float dB = 0.0f;
+    float tempAvg = 0.0f;
+    float humAvg  = 0.0f;
+    float luxAvg  = 0.0f;
+    float noiseAvg= 0.0f;
 
-    Serial.println("[Sensors] Taking measurements...");
+    for (int i = 0; i < readingsBufferSize; ++i) {
+        tempAvg += tempBuffer[i];
+        humAvg += humBuffer[i];
+        luxAvg += luxBuffer[i];
+        noiseAvg += noiseBuffer[i];
 
-    bool luxOk = readBH1750_with_retry(&lux);
-    bool dhtOk = readDHT11_with_retry(&dhtData);
-    bool dBok = readINMP441_with_retry(&dB);
+        Serial.printf("[Averaging] Reading %d: Temp=%.2f C, Hum=%.2f %%, Lux=%.2f lx, Noise=%.2f dB\n", 
+                      i, tempBuffer[i], humBuffer[i], luxBuffer[i], noiseBuffer[i]);
+    }
 
-    Serial.println("--------------------------------------------");
+    tempAvg /= readingsBufferSize;
+    humAvg /= readingsBufferSize;
+    luxAvg /= readingsBufferSize;
+    noiseAvg /= readingsBufferSize;
 
     Measurement measurement = {
-      .temperatureC = dhtData.temperature,
-      .humidityPct  = dhtData.humidity,
-      .lightLux     = lux,
-      .noiseDb      = dB,
+      .temperatureC = tempAvg,
+      .humidityPct  = humAvg,
+      .lightLux     = luxAvg,
+      .noiseDb      = noiseAvg,
       .timestamp    =  0
     };
 
