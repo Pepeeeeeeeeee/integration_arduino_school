@@ -5,12 +5,20 @@
 #include "MeasurementBuffer.h"
 
 // WIFI CREDENTIALS
-static String WIFI_SSID  = "REDACTED-NETWORK-NAME";
-static String WIFI_PASS  = ""; // individual password
-static String API_URL    = "http://10.134.178.156:8000/v1/ingest";
+// static String WIFI_SSID  = "REDACTED-NETWORK-NAME";
+// static String WIFI_PASS  = "REDACTED-WIFI-PASSWORD"; // individual password
+// static String API_URL    = "http://10.134.178.156:8000/v1/ingest";
+
+// static String WIFI_SSID  = "Proximus-Home-ABE0";
+// static String WIFI_PASS  = "REDACTED-WIFI-PASSWORD"; // individual password
+// static String API_URL    = "http://192.168.1.33:8000/v1/ingest";
+
+static String WIFI_SSID  = "Moto G7";
+static String WIFI_PASS  = "REDACTED-WIFI-PASSWORD"; // individual password
+static String API_URL    = "http://192.168.43.202:8000/v1/ingest";
 
 static String API_KEY    = "REDACTED-API-KEY";
-static String DEVICE_UID = "ESP_TEST";
+static String DEVICE_UID = "test";
 
 static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000; // Wi-Fi connect attempt window
 static const uint32_t SEND_INTERVAL_MS = 5UL * 60UL * 1000UL; // Send every 5 minutes 
@@ -172,6 +180,7 @@ float humBuffer[readingsBufferSize];
 float luxBuffer[readingsBufferSize];
 float noiseBuffer[readingsBufferSize];
 uint8_t currentReadingIndex = 0;
+uint8_t readingsCount = 0;
 
 void loop() {
   const uint32_t now = millis();
@@ -195,6 +204,9 @@ void loop() {
                       currentReadingIndex, dhtData.temperature, dhtData.humidity, lux, noiseDb);
 
         currentReadingIndex = (currentReadingIndex + 1) % readingsBufferSize;
+        if (readingsCount < readingsBufferSize) {
+            readingsCount++;
+        }
     } else {
         Serial.println("[Read] One or more sensor reads failed, skipping this reading.");
     }
@@ -219,7 +231,7 @@ void loop() {
     float luxAvg  = 0.0f;
     float noiseAvg= 0.0f;
 
-    for (int i = 0; i < readingsBufferSize; ++i) {
+    for (int i = 0; i < readingsCount; ++i) {
         tempAvg += tempBuffer[i];
         humAvg += humBuffer[i];
         luxAvg += luxBuffer[i];
@@ -229,10 +241,10 @@ void loop() {
                       i, tempBuffer[i], humBuffer[i], luxBuffer[i], noiseBuffer[i]);
     }
 
-    tempAvg /= readingsBufferSize;
-    humAvg /= readingsBufferSize;
-    luxAvg /= readingsBufferSize;
-    noiseAvg /= readingsBufferSize;
+    tempAvg /= readingsCount;
+    humAvg /= readingsCount;
+    luxAvg /= readingsCount;
+    noiseAvg /= readingsCount;
 
     Measurement measurement = {
       .temperatureC = tempAvg,
