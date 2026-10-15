@@ -3,22 +3,7 @@
 #include "INMP441_arduino.h"
 #include "DHT11.h"
 #include "MeasurementBuffer.h"
-
-// WIFI CREDENTIALS
-// static String WIFI_SSID  = "REDACTED-NETWORK-NAME";
-// static String WIFI_PASS  = "REDACTED-WIFI-PASSWORD"; // individual password
-// static String API_URL    = "http://10.134.178.156:8000/v1/ingest";
-
-// static String WIFI_SSID  = "Proximus-Home-ABE0";
-// static String WIFI_PASS  = "REDACTED-WIFI-PASSWORD"; // individual password
-// static String API_URL    = "http://192.168.1.33:8000/v1/ingest";
-
-static String WIFI_SSID  = "Moto G7";
-static String WIFI_PASS  = "REDACTED-WIFI-PASSWORD"; // individual password
-static String API_URL    = "http://192.168.43.202:8000/v1/ingest";
-
-static String API_KEY    = "REDACTED-API-KEY";
-static String DEVICE_UID = "test";
+#include "credentials.h" // WIFI_SSID / WIFI_PASS / API_URL / API_KEY / DEVICE_UID - see credentials.example.h
 
 static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000; // Wi-Fi connect attempt window
 static const uint32_t SEND_INTERVAL_MS = 5UL * 60UL * 1000UL; // Send every 5 minutes 

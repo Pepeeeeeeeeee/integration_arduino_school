@@ -16,17 +16,18 @@
 ```bash
 git clone git@gitlab.com:kdg-ti/integration-2.1/25-26/team-6-aura-ambient-unified-room-assessment/arduino.git
 ```
-2. If necessary adjust WiFi credentials:
+2. Credentials (WiFi + data-collector API key) are not committed. Copy the template and fill
+   in real values:
+```bash
+cp src/credentials.example.h src/credentials.h
+```
 ```C
-static String WIFI_SSID = "REDACTED-NETWORK-NAME"; // network name
-
-static String WIFI_PASS = ""; // individual password
-
-static String API_URL = "http://10.134.178.156:8000/v1/ingest"; // data collector service
-
-static String API_KEY = "REDACTED-API-KEY"; // api key to authenticate valid device in data collector service
-
-static String DEVICE_UID = "ESP_TEST"; // Device name
+// src/credentials.h (gitignored, never committed)
+static String WIFI_SSID  = "your-network-name";
+static String WIFI_PASS  = "your-network-password";
+static String API_URL    = "http://<collector-host>:8000/v1/ingest"; // data collector service
+static String API_KEY    = "your-collector-api-key"; // shared secret with the data collector service
+static String DEVICE_UID = "test"; // device name sent with each measurement
 ```
 
    3. If your're using different pins adjust the following block in the code to your new pins (VCC/VDD is always power, the rest should be grounded):
